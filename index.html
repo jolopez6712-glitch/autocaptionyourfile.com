@@ -21,8 +21,8 @@
     @keyframes fall { to { transform:translate(var(--drift),230px) rotate(680deg); opacity:0; } }
   </style>
   <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
-  <!-- In-Browser Speech AI (Whisper) Engine -->
-  <script src="https://unpkg.com/@xenova/transformers@2.14.0/dist/transformers.min.js"></script>
+  <!-- Primary CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
 </head>
 <body class="app-shell" style="background: rgb(245, 243, 235);">
   <div class="w-full">
@@ -34,15 +34,15 @@
           </div>
           <span class="font-bold tracking-tight text-[#182722] text-base">AUTO CAPTION STUDIO</span>
         </div>
-        <span id="model-badge" class="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-green-800 text-sm font-semibold">Ready for Auto-Captioning</span>
+        <span id="model-badge" class="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-green-800 text-sm font-semibold">Ready for Client-Side AI</span>
       </div>
     </header>
 
     <main class="mx-auto max-w-5xl px-5 py-9 md:px-10 md:py-12">
       <div class="mb-9 max-w-3xl">
-        <p class="mb-3 font-bold uppercase tracking-[.2em] text-[#607448] text-sm">EXACT SPEECH TRANSCRIPTION</p>
+        <p class="mb-3 font-bold uppercase tracking-[.2em] text-[#607448] text-sm">CLIENT-SIDE SPEECH RECOGNITION</p>
         <h1 class="leading-tight text-[#182722] text-3xl font-bold">Automatic Captions &amp; Video Generator</h1>
-        <p class="mt-4 leading-relaxed text-[#53645a] text-base">Upload an audio or video file. Transcribes exact spoken dialogue, generates timed SRT subtitle files, and bakes white captions onto video output.</p>
+        <p class="mt-4 leading-relaxed text-[#53645a] text-base">Upload an audio or video file. Whisper AI processes the raw audio bytes directly inside your browser to extract actual spoken words, build timed SRT subtitles, and export burnt-in captioned videos.</p>
       </div>
 
       <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)]">
@@ -58,8 +58,12 @@
                 <input id="media-file" class="field" type="file" accept="audio/*,video/*">
               </div>
               <div>
-                <label class="mb-2 block font-semibold text-[#182722]" for="api-key">AssemblyAI Key <span class="text-xs font-normal text-gray-500">(Optional for iframe sandbox)</span></label>
-                <input id="api-key" class="field" type="password" placeholder="Key only needed in OneCompiler">
+                <label class="mb-2 block font-semibold text-[#182722]" for="language">Speech Model</label>
+                <select id="language" class="field">
+                  <option value="Xenova/whisper-tiny.en">English (Whisper Tiny)</option>
+                  <option value="Xenova/whisper-tiny">Multilingual (Whisper Tiny)</option>
+                  <option value="Xenova/whisper-base.en">English High Accuracy (Whisper Base)</option>
+                </select>
               </div>
             </div>
 
@@ -129,7 +133,7 @@
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const mediaFileInput = document.getElementById("media-file");
-      const apiKeyInput = document.getElementById("api-key");
+      const languageSelect = document.getElementById("language");
       const previewWrap = document.getElementById("preview-wrap");
       const videoPreview = document.getElementById("video-preview");
       const audioPreview = document.getElementById("audio-preview");
@@ -219,7 +223,7 @@
         setStatus("");
 
         try {
-          updateProgress(20, "Extracting spoken speech...");
+          updateProgress(20, "Running Whisper AI model on browser audio...");
           const spokenCues = await extractSpeechFromAudioBuffer(selectedFile);
 
           if (!spokenCues || spokenCues.length === 0) {
@@ -227,7 +231,7 @@
           }
 
           if (wantSrt) {
-            updateProgress(70, "Generating SRT file...");
+            updateProgress(70, "Generating SRT subtitle file...");
             const srtContent = buildSrtString(spokenCues);
             if (srtBlobUrl) URL.revokeObjectURL(srtBlobUrl);
             const srtBlob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
@@ -253,104 +257,54 @@
         }
       }
 
-      async function extractSpeechFromAudioBuffer(file) {
-        const apiKey = apiKeyInput.value.trim();
+      // Safe Pipeline Resolver with script fallbacks
+      async function getPipeline() {
+        if (window.transformers?.pipeline) return window.transformers;
+        if (window.Transformers?.pipeline) return window.Transformers;
 
-        // 1. If user provided API key, use AssemblyAI Cloud
-        if (apiKey) {
-          return await transcribeWithAssemblyAI(file, apiKey);
-        }
-
-        // 2. Otherwise try local in-browser Whisper AI (Works on GitHub Pages, Netlify, localhost)
-        const pipelineFn = window.transformers?.pipeline || window.Transformers?.pipeline;
-        if (pipelineFn) {
-          try {
-            setStatus("Loading in-browser Whisper AI model...", "text-blue-700");
-            const env = window.transformers?.env || window.Transformers?.env;
-            if (env) env.allowLocalModels = false;
-
-            const transcriber = await pipelineFn('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
-            const arrayBuffer = await file.arrayBuffer();
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-            const rawAudio = audioBuffer.getChannelData(0);
-
-            const output = await transcriber(rawAudio, { return_timestamps: true });
-            if (output && output.chunks && output.chunks.length > 0) {
-              return output.chunks.map(chunk => ({
-                startMs: (chunk.timestamp[0] ?? 0) * 1000,
-                endMs: (chunk.timestamp[1] ?? 2) * 1000,
-                startSec: chunk.timestamp[0] ?? 0,
-                endSec: chunk.timestamp[1] ?? 2,
-                text: chunk.text.trim()
-              })).filter(c => c.text.length > 0);
-            }
-          } catch (e) {
-            console.log("Local Whisper failed (iframe sandbox active).");
-          }
-        }
-
-        throw new Error("Local WebAssembly AI is blocked by OneCompiler's sandbox. Please enter a free AssemblyAI key, or host this file on GitHub Pages/Netlify.");
+        // Dynamic script loading fallback if primary CDN was delayed
+        return new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://unpkg.com/@xenova/transformers@2.17.2/dist/transformers.min.js";
+          script.onload = () => {
+            const lib = window.transformers || window.Transformers;
+            if (lib?.pipeline) resolve(lib);
+            else reject(new Error("Failed to initialize Transformers library."));
+          };
+          script.onerror = () => reject(new Error("Could not load Transformers CDN."));
+          document.head.appendChild(script);
+        });
       }
 
-      async function transcribeWithAssemblyAI(file, apiKey) {
-        setStatus("Uploading audio to cloud transcriber...", "text-blue-700");
-        const uploadResponse = await fetch("https://api.assemblyai.com/v2/upload", {
-          method: "POST",
-          headers: { "authorization": apiKey },
-          body: file
-        });
-        const uploadData = await uploadResponse.json();
-        if (!uploadData.upload_url) {
-          throw new Error("Invalid API key or upload failure.");
+      async function extractSpeechFromAudioBuffer(file) {
+        setStatus("Loading in-browser Whisper AI pipeline...", "text-blue-700");
+        const lib = await getPipeline();
+        
+        if (lib.env) {
+          lib.env.allowLocalModels = false;
         }
 
-        setStatus("Transcribing spoken dialogue...", "text-blue-700");
-        const transcriptResponse = await fetch("https://api.assemblyai.com/v2/transcript", {
-          method: "POST",
-          headers: {
-            "authorization": apiKey,
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({ audio_url: uploadData.upload_url })
-        });
-        const transcriptData = await transcriptResponse.json();
-        const transcriptId = transcriptData.id;
+        const modelName = languageSelect.value;
+        const transcriber = await lib.pipeline('automatic-speech-recognition', modelName);
 
-        let completed = false;
-        let result = null;
-        while (!completed && isProcessing) {
-          await new Promise(r => setTimeout(r, 2000));
-          const pollingResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
-            headers: { "authorization": apiKey }
-          });
-          result = await pollingResponse.json();
-          if (result.status === "completed") completed = true;
-          else if (result.status === "error") throw new Error(result.error);
-        }
+        setStatus("Decoding audio stream to 16kHz float array...", "text-blue-700");
+        const arrayBuffer = await file.arrayBuffer();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        const rawAudio = audioBuffer.getChannelData(0);
 
-        if (!result || !result.words) return [];
+        setStatus("Transcribing spoken words locally...", "text-blue-700");
+        const output = await transcriber(rawAudio, { return_timestamps: true });
 
-        const cues = [];
-        const words = result.words;
-        const chunkSize = 5;
+        if (!output || !output.chunks) return [];
 
-        for (let i = 0; i < words.length; i += chunkSize) {
-          const chunk = words.slice(i, i + chunkSize);
-          const startMs = chunk[0].start;
-          const endMs = chunk[chunk.length - 1].end;
-          const text = chunk.map(w => w.text).join(" ");
-
-          cues.push({
-            startMs,
-            endMs,
-            startSec: startMs / 1000,
-            endSec: endMs / 1000,
-            text
-          });
-        }
-
-        return cues;
+        return output.chunks.map(chunk => ({
+          startMs: (chunk.timestamp[0] ?? 0) * 1000,
+          endMs: (chunk.timestamp[1] ?? 2) * 1000,
+          startSec: chunk.timestamp[0] ?? 0,
+          endSec: chunk.timestamp[1] ?? 2,
+          text: chunk.text.trim()
+        })).filter(c => c.text.length > 0);
       }
 
       function renderVideoWithCaptions(cues) {
