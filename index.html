@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Caption Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Fraunces:opsz,wght@9..144,600;9..144,700&amp;display=swap" rel="stylesheet">
+  <style>
+    :root { --ink:#182722; --muted:#61716a; --paper:#f5f3eb; --line:#d9ddd3; --accent:#d8ef71; }
+    * { box-sizing:border-box; }
+    body { font-family:"DM Sans",sans-serif; color:var(--ink); margin:0; }
+    h1,h2 { font-family:"Fraunces",serif; }
+    .app-shell { width:100%; min-height:100vh; background:radial-gradient(circle at 88% 4%,#e6ebd8 0,transparent 32%),var(--paper); }
+    .surface { background:#fffefa; border:1px solid var(--line); box-shadow:0 12px 32px #243a2710; }
+    .field { width:100%; min-width:0; border:1px solid #cbd2c8; background:#fff; border-radius:12px; padding:11px 13px; color:var(--ink); }
+    .field:focus,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid #93ad3e; outline-offset:2px; }
+    button { transition:transform .16s ease,background .16s ease,opacity .16s ease; cursor:pointer; }
+    button:not(:disabled):hover { transform:translateY(-2px); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .confetti-piece { position:absolute; top:-18px; width:8px; height:13px; pointer-events:none; animation:fall 1.8s ease-in forwards; }
+    @keyframes fall { to { transform:translate(var(--drift),230px) rotate(680deg); opacity:0; } }
+  </style>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+  <!-- In-Browser Speech AI (Whisper) Engine -->
+  <script src="https://unpkg.com/@xenova/transformers@2.14.0/dist/transformers.min.js"></script>
+</head>
+<body class="app-shell" style="background: rgb(245, 243, 235);">
+  <div class="w-full">
+    <header class="border-b border-[#d9ddd3] px-5 py-5 md:px-10">
+      <div class="mx-auto max-w-5xl flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="grid h-10 w-10 place-items-center rounded-xl bg-[#182722] text-[#d8ef71] font-bold" aria-hidden="true">
+            CC
+          </div>
+          <span class="font-bold tracking-tight text-[#182722] text-base">AUTO CAPTION STUDIO</span>
+        </div>
+        <span id="model-badge" class="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-green-800 text-sm font-semibold">Ready for Auto-Captioning</span>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-5xl px-5 py-9 md:px-10 md:py-12">
+      <div class="mb-9 max-w-3xl">
+        <p class="mb-3 font-bold uppercase tracking-[.2em] text-[#607448] text-sm">EXACT SPEECH TRANSCRIPTION</p>
+        <h1 class="leading-tight text-[#182722] text-3xl font-bold">Automatic Captions &amp; Video Generator</h1>
+        <p class="mt-4 leading-relaxed text-[#53645a] text-base">Upload an audio or video file. Transcribes exact spoken dialogue, generates timed SRT subtitle files, and bakes white captions onto video output.</p>
+      </div>
+
+      <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)]">
+        <div class="space-y-6">
+          <section class="surface rounded-3xl p-5 md:p-7" style="background: rgb(255, 254, 250);">
+            <div class="mb-5 flex items-center gap-3">
+              <span class="grid h-8 w-8 place-items-center rounded-full bg-[#d8ef71] font-bold">01</span>
+              <h2 class="text-xl font-bold text-[#182722]">Media Upload</h2>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="mb-2 block font-semibold text-[#182722]" for="media-file">Audio or Video File</label>
+                <input id="media-file" class="field" type="file" accept="audio/*,video/*">
+              </div>
+              <div>
+                <label class="mb-2 block font-semibold text-[#182722]" for="api-key">AssemblyAI Key <span class="text-xs font-normal text-gray-500">(Optional for iframe sandbox)</span></label>
+                <input id="api-key" class="field" type="password" placeholder="Key only needed in OneCompiler">
+              </div>
+            </div>
+
+            <div id="preview-wrap" class="mt-5 hidden overflow-hidden rounded-2xl bg-[#17221e] p-3">
+              <video id="video-preview" class="hidden max-h-72 w-full rounded-xl object-contain" controls playsinline></video>
+              <audio id="audio-preview" class="hidden w-full" controls></audio>
+              <p id="media-details" class="mt-2 text-sm text-[#d8e1d9]"></p>
+            </div>
+          </section>
+
+          <section class="surface rounded-3xl p-5 md:p-7" style="background: rgb(255, 254, 250);">
+            <div class="mb-5 flex items-center gap-3">
+              <span class="grid h-8 w-8 place-items-center rounded-full bg-[#d8ef71] font-bold">02</span>
+              <h2 class="text-xl font-bold text-[#182722]">Choose Outputs</h2>
+            </div>
+            <div class="space-y-3">
+              <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#d9ddd3] p-4">
+                <input id="want-srt" type="checkbox" checked class="mt-1 h-5 w-5 accent-[#334f32]">
+                <span>
+                  <span class="block font-bold text-[#182722]">Timed SRT Subtitle File (.srt)</span>
+                  <span class="block text-sm text-[#61716a]">Export exact spoken text with timestamps.</span>
+                </span>
+              </label>
+              <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#d9ddd3] p-4">
+                <input id="want-video" type="checkbox" checked class="mt-1 h-5 w-5 accent-[#334f32]">
+                <span>
+                  <span class="block font-bold text-[#182722]">Video with Burnt-in Captions (.webm)</span>
+                  <span class="block text-sm text-[#61716a]">Bakes text onto video. Audio files produce black video with white text.</span>
+                </span>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <aside>
+          <section class="surface relative overflow-hidden rounded-3xl p-5 md:p-7" style="background: rgb(255, 254, 250);">
+            <div id="confetti" class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true"></div>
+            <h2 class="mb-2 text-xl font-bold text-[#182722]">Automatic Processing</h2>
+            <p class="mb-5 text-sm text-[#61716a]">Extracts spoken dialogue and bakes synchronized subtitles.</p>
+            
+            <div class="flex flex-wrap gap-3">
+              <button id="start-button" type="button" class="rounded-xl bg-[#182722] px-6 py-3 font-bold text-white hover:bg-[#31493a]">Transcribe &amp; Export →</button>
+              <button id="stop-button" type="button" class="hidden rounded-xl border border-[#b96a5d] px-6 py-3 font-bold text-[#923d32] hover:bg-[#fff0eb]">Cancel</button>
+            </div>
+
+            <div id="progress-wrap" class="mt-5 hidden">
+              <div class="h-2 overflow-hidden rounded-full bg-[#e2e8d9]">
+                <div id="progress-bar" class="h-full w-0 rounded-full bg-[#759a42] transition-[width] duration-300"></div>
+              </div>
+              <p id="progress-text" class="mt-2 text-sm text-[#53645a]"></p>
+            </div>
+
+            <p id="status" class="mt-4 min-h-6 text-sm font-semibold text-[#425d42]" role="status" aria-live="polite"></p>
+
+            <div id="downloads" class="mt-4 hidden flex flex-col gap-3">
+              <a id="download-srt" class="hidden text-center rounded-xl bg-[#d8ef71] px-4 py-3 font-bold text-[#182722] hover:bg-[#c5e75a]">Download Subtitles (.srt)</a>
+              <a id="download-video" class="hidden text-center rounded-xl bg-[#182722] px-4 py-3 font-bold text-white hover:bg-[#31493a]">Download Captioned Video (.webm)</a>
+            </div>
+
+            <video id="result-preview" class="mt-5 hidden max-h-80 w-full rounded-2xl bg-[#17221e] object-contain" controls playsinline></video>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const mediaFileInput = document.getElementById("media-file");
+      const apiKeyInput = document.getElementById("api-key");
+      const previewWrap = document.getElementById("preview-wrap");
+      const videoPreview = document.getElementById("video-preview");
+      const audioPreview = document.getElementById("audio-preview");
+      const mediaDetails = document.getElementById("media-details");
+
+      const wantSrtCheckbox = document.getElementById("want-srt");
+      const wantVideoCheckbox = document.getElementById("want-video");
+
+      const startBtn = document.getElementById("start-button");
+      const stopBtn = document.getElementById("stop-button");
+      const progressWrap = document.getElementById("progress-wrap");
+      const progressBar = document.getElementById("progress-bar");
+      const progressText = document.getElementById("progress-text");
+      const statusEl = document.getElementById("status");
+
+      const downloadsWrap = document.getElementById("downloads");
+      const downloadSrtLink = document.getElementById("download-srt");
+      const downloadVideoLink = document.getElementById("download-video");
+      const resultPreview = document.getElementById("result-preview");
+      const confettiContainer = document.getElementById("confetti");
+
+      let selectedFile = null;
+      let activeMediaEl = null;
+      let mediaDuration = 0;
+      let isProcessing = false;
+      let mediaRecorder = null;
+      let recordedChunks = [];
+      let srtBlobUrl = null;
+      let videoBlobUrl = null;
+
+      mediaFileInput.addEventListener("change", handleFileSelect);
+      startBtn.addEventListener("click", startAutomaticProcess);
+      stopBtn.addEventListener("click", cancelProcessing);
+
+      function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        selectedFile = file;
+        const fileUrl = URL.createObjectURL(file);
+        const isVideo = file.type.startsWith("video/");
+
+        previewWrap.classList.remove("hidden");
+        videoPreview.classList.add("hidden");
+        audioPreview.classList.add("hidden");
+
+        if (isVideo) {
+          activeMediaEl = videoPreview;
+          videoPreview.src = fileUrl;
+          videoPreview.classList.remove("hidden");
+        } else {
+          activeMediaEl = audioPreview;
+          audioPreview.src = fileUrl;
+          audioPreview.classList.remove("hidden");
+        }
+
+        activeMediaEl.onloadedmetadata = () => {
+          mediaDuration = activeMediaEl.duration;
+          const mins = Math.floor(mediaDuration / 60);
+          const secs = Math.floor(mediaDuration % 60);
+          mediaDetails.textContent = `File: ${file.name} | Type: ${file.type || 'audio/video'} | Duration: ${mins}m ${secs}s`;
+        };
+      }
+
+      async function startAutomaticProcess() {
+        if (!selectedFile) {
+          setStatus("Please select an audio or video file first.", "text-red-600");
+          return;
+        }
+
+        const wantSrt = wantSrtCheckbox.checked;
+        const wantVideo = wantVideoCheckbox.checked;
+
+        if (!wantSrt && !wantVideo) {
+          setStatus("Please select at least one output option.", "text-red-600");
+          return;
+        }
+
+        isProcessing = true;
+        startBtn.disabled = true;
+        stopBtn.classList.remove("hidden");
+        progressWrap.classList.remove("hidden");
+        downloadsWrap.classList.add("hidden");
+        downloadSrtLink.classList.add("hidden");
+        downloadVideoLink.classList.add("hidden");
+        resultPreview.classList.add("hidden");
+        setStatus("");
+
+        try {
+          updateProgress(20, "Extracting spoken speech...");
+          const spokenCues = await extractSpeechFromAudioBuffer(selectedFile);
+
+          if (!spokenCues || spokenCues.length === 0) {
+            throw new Error("No spoken dialogue detected in file.");
+          }
+
+          if (wantSrt) {
+            updateProgress(70, "Generating SRT file...");
+            const srtContent = buildSrtString(spokenCues);
+            if (srtBlobUrl) URL.revokeObjectURL(srtBlobUrl);
+            const srtBlob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+            srtBlobUrl = URL.createObjectURL(srtBlob);
+
+            const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
+            downloadSrtLink.href = srtBlobUrl;
+            downloadSrtLink.download = `${baseName}_auto.srt`;
+            downloadSrtLink.classList.remove("hidden");
+          }
+
+          if (wantVideo) {
+            updateProgress(85, "Baking captions into video output...");
+            await renderVideoWithCaptions(spokenCues);
+          }
+
+          finishProcessing(true);
+        } catch (err) {
+          if (err.message !== "Cancelled") {
+            setStatus("Transcription error: " + err.message, "text-red-600");
+          }
+          finishProcessing(false);
+        }
+      }
+
+      async function extractSpeechFromAudioBuffer(file) {
+        const apiKey = apiKeyInput.value.trim();
+
+        // 1. If user provided API key, use AssemblyAI Cloud
+        if (apiKey) {
+          return await transcribeWithAssemblyAI(file, apiKey);
+        }
+
+        // 2. Otherwise try local in-browser Whisper AI (Works on GitHub Pages, Netlify, localhost)
+        const pipelineFn = window.transformers?.pipeline || window.Transformers?.pipeline;
+        if (pipelineFn) {
+          try {
+            setStatus("Loading in-browser Whisper AI model...", "text-blue-700");
+            const env = window.transformers?.env || window.Transformers?.env;
+            if (env) env.allowLocalModels = false;
+
+            const transcriber = await pipelineFn('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
+            const arrayBuffer = await file.arrayBuffer();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            const rawAudio = audioBuffer.getChannelData(0);
+
+            const output = await transcriber(rawAudio, { return_timestamps: true });
+            if (output && output.chunks && output.chunks.length > 0) {
+              return output.chunks.map(chunk => ({
+                startMs: (chunk.timestamp[0] ?? 0) * 1000,
+                endMs: (chunk.timestamp[1] ?? 2) * 1000,
+                startSec: chunk.timestamp[0] ?? 0,
+                endSec: chunk.timestamp[1] ?? 2,
+                text: chunk.text.trim()
+              })).filter(c => c.text.length > 0);
+            }
+          } catch (e) {
+            console.log("Local Whisper failed (iframe sandbox active).");
+          }
+        }
+
+        throw new Error("Local WebAssembly AI is blocked by OneCompiler's sandbox. Please enter a free AssemblyAI key, or host this file on GitHub Pages/Netlify.");
+      }
+
+      async function transcribeWithAssemblyAI(file, apiKey) {
+        setStatus("Uploading audio to cloud transcriber...", "text-blue-700");
+        const uploadResponse = await fetch("https://api.assemblyai.com/v2/upload", {
+          method: "POST",
+          headers: { "authorization": apiKey },
+          body: file
+        });
+        const uploadData = await uploadResponse.json();
+        if (!uploadData.upload_url) {
+          throw new Error("Invalid API key or upload failure.");
+        }
+
+        setStatus("Transcribing spoken dialogue...", "text-blue-700");
+        const transcriptResponse = await fetch("https://api.assemblyai.com/v2/transcript", {
+          method: "POST",
+          headers: {
+            "authorization": apiKey,
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({ audio_url: uploadData.upload_url })
+        });
+        const transcriptData = await transcriptResponse.json();
+        const transcriptId = transcriptData.id;
+
+        let completed = false;
+        let result = null;
+        while (!completed && isProcessing) {
+          await new Promise(r => setTimeout(r, 2000));
+          const pollingResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
+            headers: { "authorization": apiKey }
+          });
+          result = await pollingResponse.json();
+          if (result.status === "completed") completed = true;
+          else if (result.status === "error") throw new Error(result.error);
+        }
+
+        if (!result || !result.words) return [];
+
+        const cues = [];
+        const words = result.words;
+        const chunkSize = 5;
+
+        for (let i = 0; i < words.length; i += chunkSize) {
+          const chunk = words.slice(i, i + chunkSize);
+          const startMs = chunk[0].start;
+          const endMs = chunk[chunk.length - 1].end;
+          const text = chunk.map(w => w.text).join(" ");
+
+          cues.push({
+            startMs,
+            endMs,
+            startSec: startMs / 1000,
+            endSec: endMs / 1000,
+            text
+          });
+        }
+
+        return cues;
+      }
+
+      function renderVideoWithCaptions(cues) {
+        return new Promise((resolve, reject) => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+
+          const isVideo = selectedFile.type.startsWith("video/");
+          const mediaEl = activeMediaEl;
+
+          canvas.width = isVideo && mediaEl.videoWidth ? mediaEl.videoWidth : 1280;
+          canvas.height = isVideo && mediaEl.videoHeight ? mediaEl.videoHeight : 720;
+
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const sourceNode = audioCtx.createMediaElementSource(mediaEl);
+          const destNode = audioCtx.createMediaStreamDestination();
+          sourceNode.connect(destNode);
+          sourceNode.connect(audioCtx.destination);
+
+          const canvasStream = canvas.captureStream(30);
+          destNode.stream.getAudioTracks().forEach((track) => canvasStream.addTrack(track));
+
+          mediaRecorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
+          recordedChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            if (!isProcessing) return reject(new Error("Cancelled"));
+
+            if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
+            const videoBlob = new Blob(recordedChunks, { type: "video/webm" });
+            videoBlobUrl = URL.createObjectURL(videoBlob);
+
+            const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
+            downloadVideoLink.href = videoBlobUrl;
+            downloadVideoLink.download = `${baseName}_captioned.webm`;
+            downloadVideoLink.classList.remove("hidden");
+
+            resultPreview.src = videoBlobUrl;
+            resultPreview.classList.remove("hidden");
+
+            resolve();
+          };
+
+          mediaEl.currentTime = 0;
+          mediaEl.play();
+          mediaRecorder.start();
+
+          function drawFrame() {
+            if (!isProcessing || mediaEl.ended || mediaEl.paused) {
+              if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+              return;
+            }
+
+            const currentTime = mediaEl.currentTime;
+
+            if (mediaDuration > 0) {
+              const pct = Math.min(100, Math.round((currentTime / mediaDuration) * 100));
+              updateProgress(pct, `Rendering burnt-in video... ${pct}%`);
+            }
+
+            if (isVideo) {
+              ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
+            } else {
+              ctx.fillStyle = "#000000";
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            const activeCue = cues.find((c) => currentTime >= c.startSec && currentTime <= c.endSec);
+            if (activeCue) {
+              drawCaptionOverlay(ctx, activeCue.text, canvas.width, canvas.height);
+            }
+
+            requestAnimationFrame(drawFrame);
+          }
+
+          requestAnimationFrame(drawFrame);
+        });
+      }
+
+      function drawCaptionOverlay(ctx, text, width, height) {
+        const fontSize = Math.max(22, Math.floor(height * 0.05));
+        ctx.font = `700 ${fontSize}px "DM Sans", sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const lines = text.split("\n");
+        const padding = fontSize * 0.7;
+        const lineHeight = fontSize * 1.35;
+
+        let maxLineWidth = 0;
+        lines.forEach((line) => {
+          const w = ctx.measureText(line).width;
+          if (w > maxLineWidth) maxLineWidth = w;
+        });
+
+        const boxWidth = maxLineWidth + padding * 2;
+        const boxHeight = lines.length * lineHeight + padding;
+        const boxX = (width - boxWidth) / 2;
+        const boxY = height - boxHeight - height * 0.1;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 10);
+        } else {
+          ctx.rect(boxX, boxY, boxWidth, boxHeight);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = "#FFFFFF";
+        lines.forEach((line, idx) => {
+          const lineY = boxY + padding + idx * lineHeight + fontSize / 2;
+          ctx.fillText(line, width / 2, lineY);
+        });
+      }
+
+      function buildSrtString(cues) {
+        return cues
+          .map((cue, index) => {
+            const startFormatted = formatMsToSrtTime(cue.startMs);
+            const endFormatted = formatMsToSrtTime(cue.endMs);
+            return `${index + 1}\n${startFormatted} --> ${endFormatted}\n${cue.text}\n`;
+          })
+          .join("\n");
+      }
+
+      function formatMsToSrtTime(msTotal) {
+        const ms = Math.floor(msTotal % 1000);
+        const totalSecs = Math.floor(msTotal / 1000);
+        const hrs = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+
+        return (
+          String(hrs).padStart(2, "0") + ":" +
+          String(mins).padStart(2, "0") + ":" +
+          String(secs).padStart(2, "0") + "," +
+          String(ms).padStart(3, "0")
+        );
+      }
+
+      function updateProgress(percent, text) {
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = text;
+      }
+
+      function finishProcessing(success) {
+        isProcessing = false;
+        startBtn.disabled = false;
+        stopBtn.classList.add("hidden");
+        progressWrap.classList.add("hidden");
+
+        if (success) {
+          downloadsWrap.classList.remove("hidden");
+          setStatus("Speech transcription & export complete!", "text-green-700");
+          triggerConfetti();
+        }
+      }
+
+      function cancelProcessing() {
+        isProcessing = false;
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+        if (activeMediaEl) {
+          activeMediaEl.pause();
+          activeMediaEl.currentTime = 0;
+        }
+        setStatus("Process cancelled.", "text-amber-700");
+        finishProcessing(false);
+      }
+
+      function setStatus(message, textClass = "text-[#425d42]") {
+        statusEl.className = `mt-4 min-h-6 text-sm font-semibold ${textClass}`;
+        statusEl.textContent = message;
+      }
+
+      function triggerConfetti() {
+        confettiContainer.innerHTML = "";
+        const colors = ["#d8ef71", "#759a42", "#182722", "#cbd2c8"];
+
+        for (let i = 0; i < 25; i++) {
+          const piece = document.createElement("div");
+          piece.className = "confetti-piece";
+          piece.style.left = `${Math.random() * 100}%`;
+          piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 150}px`);
+          piece.style.animationDelay = `${Math.random() * 0.4}s`;
+          confettiContainer.appendChild(piece);
+        }
+
+        setTimeout(() => {
+          confettiContainer.innerHTML = "";
+        }, 2500);
+      }
+    });
+  </script>
+</body>
+</html>
