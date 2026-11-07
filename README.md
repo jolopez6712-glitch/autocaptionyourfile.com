@@ -1,0 +1,2 @@
+# autocaptionyourfile.com
+yes
