@@ -141,11 +141,7 @@
     </main>
   </div>
 
-  <script type="module">
-    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
-
-    env.allowLocalModels = false;
-
+  <script>
     document.addEventListener("DOMContentLoaded", () => {
       // 1. Real-time File Update Tracker
       const fileLastModified = new Date(document.lastModified);
@@ -235,7 +231,7 @@
         } else {
           activeMediaEl = audioPreview;
           audioPreview.src = fileUrl;
-          audioPreview.classList.remove("hidden");
+          audioPreview.classList.add("hidden");
         }
 
         activeMediaEl.onloadedmetadata = () => {
@@ -305,8 +301,16 @@
         }
       }
 
+      // Dynamic Module Loader to prevent startup blocking
+      async function loadTransformersPipeline() {
+        const module = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js');
+        module.env.allowLocalModels = false;
+        return module.pipeline;
+      }
+
       async function extractSpeechFromAudioBuffer(file) {
         setStatus("Loading in-browser Whisper AI pipeline...", "text-blue-700");
+        const pipeline = await loadTransformersPipeline();
         const modelName = languageSelect.value;
         const transcriber = await pipeline('automatic-speech-recognition', modelName);
 
@@ -349,11 +353,9 @@
 
         if (!output || !output.chunks) return [];
 
-        // Post-processing filter to strip bracketed noise tags ([Music], [Applause], etc.)
         return output.chunks.map(chunk => {
           let text = chunk.text.trim();
           if (filterMusicCheckbox.checked) {
-            // Remove typical bracketed audio markers
             text = text.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
           }
           return {
@@ -437,7 +439,6 @@
             const currentMediaEl = activeMediaEl;
             const currentTime = currentMediaEl.currentTime;
 
-            // FIX: Strictly stop recording the exact second mediaDuration is reached to prevent over-duration exports
             if (!isProcessing || currentMediaEl.ended || currentMediaEl.paused || (mediaDuration > 0 && currentTime >= mediaDuration)) {
               currentMediaEl.pause();
               if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
@@ -575,7 +576,7 @@
           piece.className = "confetti-piece";
           piece.style.left = `${Math.random() * 100}%`;
           piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-          piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 150}px`;
+          piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 150}px`);
           piece.style.animationDelay = `${Math.random() * 0.4}s`;
           confettiContainer.appendChild(piece);
         }
