@@ -21,8 +21,6 @@
     @keyframes fall { to { transform:translate(var(--drift),230px) rotate(680deg); opacity:0; } }
   </style>
   <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
-  <!-- Primary CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
 </head>
 <body class="app-shell" style="background: rgb(245, 243, 235);">
   <div class="w-full">
@@ -257,31 +255,51 @@
         }
       }
 
-      // Safe Pipeline Resolver with script fallbacks
+      // Safe Pipeline Resolver with Multi-CDN Fallbacks
       async function getPipeline() {
-        if (window.transformers?.pipeline) return window.transformers;
-        if (window.Transformers?.pipeline) return window.Transformers;
+        const existingLib = window.transformers || window.Transformers;
+        if (existingLib?.pipeline) return existingLib;
 
-        // Dynamic script loading fallback if primary CDN was delayed
-        return new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://unpkg.com/@xenova/transformers@2.17.2/dist/transformers.min.js";
-          script.onload = () => {
+        const cdnUrls = [
+          "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js",
+          "https://unpkg.com/@xenova/transformers@2.17.2/dist/transformers.min.js"
+        ];
+
+        for (const url of cdnUrls) {
+          try {
+            await new Promise((resolve, reject) => {
+              const script = document.createElement("script");
+              script.src = url;
+              script.crossOrigin = "anonymous";
+              script.onload = () => {
+                const lib = window.transformers || window.Transformers;
+                if (lib?.pipeline) resolve(lib);
+                else reject(new Error("Pipeline not found"));
+              };
+              script.onerror = () => reject(new Error(`Failed to load ${url}`));
+              document.head.appendChild(script);
+            });
+
             const lib = window.transformers || window.Transformers;
-            if (lib?.pipeline) resolve(lib);
-            else reject(new Error("Failed to initialize Transformers library."));
-          };
-          script.onerror = () => reject(new Error("Could not load Transformers CDN."));
-          document.head.appendChild(script);
-        });
+            if (lib?.pipeline) return lib;
+          } catch (err) {
+            console.warn(err.message);
+          }
+        }
+
+        throw new Error("Failed to initialize Transformers library from all available CDNs.");
       }
 
       async function extractSpeechFromAudioBuffer(file) {
         setStatus("Loading in-browser Whisper AI pipeline...", "text-blue-700");
         const lib = await getPipeline();
         
+        // Environment settings for GitHub Pages & remote Hugging Face model fetching
         if (lib.env) {
           lib.env.allowLocalModels = false;
+          if (lib.env.backends?.onnx) {
+            lib.env.backends.onnx.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/";
+          }
         }
 
         const modelName = languageSelect.value;
