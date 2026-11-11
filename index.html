@@ -101,8 +101,8 @@
               <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#d9ddd3] p-4 bg-[#f9fbf7]">
                 <input id="filter-music" type="checkbox" checked class="mt-1 h-5 w-5 accent-[#334f32]">
                 <span>
-                  <span class="block font-bold text-[#182722]">Filter Background Music (`[Music]` tags)</span>
-                  <span class="block text-sm text-[#61716a]">Stops Whisper from mistaking background tracks or low melodies for speech.</span>
+                  <span class="block font-bold text-[#182722]">Aggressive Music &amp; Lyric Filter</span>
+                  <span class="block text-sm text-[#61716a]">Strips out musical audio tags and background vocal hallucinations.</span>
                 </span>
               </label>
             </div>
@@ -332,7 +332,6 @@
 
         setStatus("Transcribing spoken words locally...", "text-blue-700");
         
-        // Build transcription options dynamically based on the UI settings toggle
         const transcriptionOptions = {
           return_timestamps: true,
           chunk_length_s: 30,
@@ -342,20 +341,29 @@
 
         if (filterMusicCheckbox.checked) {
           transcriptionOptions.temperature = 0.0;
-          transcriptionOptions.no_speech_threshold = 0.6;
+          transcriptionOptions.no_speech_threshold = 0.55;
+          transcriptionOptions.condition_on_previous_text = false;
         }
 
         const output = await transcriber(rawAudio, transcriptionOptions);
 
         if (!output || !output.chunks) return [];
 
-        return output.chunks.map(chunk => ({
-          startMs: (chunk.timestamp[0] ?? 0) * 1000,
-          endMs: (chunk.timestamp[1] ?? 2) * 1000,
-          startSec: chunk.timestamp[0] ?? 0,
-          endSec: chunk.timestamp[1] ?? 2,
-          text: chunk.text.trim()
-        })).filter(c => c.text.length > 0);
+        // Post-processing filter to strip bracketed noise tags ([Music], [Applause], etc.)
+        return output.chunks.map(chunk => {
+          let text = chunk.text.trim();
+          if (filterMusicCheckbox.checked) {
+            // Remove typical bracketed audio markers
+            text = text.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
+          }
+          return {
+            startMs: (chunk.timestamp[0] ?? 0) * 1000,
+            endMs: Math.min(mediaDuration * 1000, (chunk.timestamp[1] ?? 2) * 1000),
+            startSec: chunk.timestamp[0] ?? 0,
+            endSec: Math.min(mediaDuration, chunk.timestamp[1] ?? 2),
+            text: text
+          };
+        }).filter(c => c.text.length > 0);
       }
 
       function renderVideoWithCaptions(cues) {
@@ -427,12 +435,14 @@
 
           function drawFrame() {
             const currentMediaEl = activeMediaEl;
-            if (!isProcessing || currentMediaEl.ended || currentMediaEl.paused) {
+            const currentTime = currentMediaEl.currentTime;
+
+            // FIX: Strictly stop recording the exact second mediaDuration is reached to prevent over-duration exports
+            if (!isProcessing || currentMediaEl.ended || currentMediaEl.paused || (mediaDuration > 0 && currentTime >= mediaDuration)) {
+              currentMediaEl.pause();
               if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
               return;
             }
-
-            const currentTime = currentMediaEl.currentTime;
 
             if (mediaDuration > 0) {
               const pct = Math.min(100, Math.round((currentTime / mediaDuration) * 100));
@@ -565,7 +575,7 @@
           piece.className = "confetti-piece";
           piece.style.left = `${Math.random() * 100}%`;
           piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-          piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 150}px`);
+          piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 150}px`;
           piece.style.animationDelay = `${Math.random() * 0.4}s`;
           confettiContainer.appendChild(piece);
         }
