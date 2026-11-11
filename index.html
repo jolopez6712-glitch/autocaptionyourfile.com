@@ -171,12 +171,12 @@
       updateFileAgeTimer();
       setInterval(updateFileAgeTimer, 1000);
 
-      // 2. App DOM Elements & State
+      // 2. App DOM Elements & State (Using 'let' for elements that can be reassigned)
       const mediaFileInput = document.getElementById("media-file");
       const languageSelect = document.getElementById("language");
       const previewWrap = document.getElementById("preview-wrap");
-      const videoPreview = document.getElementById("video-preview");
-      const audioPreview = document.getElementById("audio-preview");
+      let videoPreview = document.getElementById("video-preview");
+      let audioPreview = document.getElementById("audio-preview");
       const mediaDetails = document.getElementById("media-details");
 
       const wantSrtCheckbox = document.getElementById("want-srt");
