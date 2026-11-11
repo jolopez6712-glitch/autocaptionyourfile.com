@@ -128,7 +128,15 @@
     </main>
   </div>
 
-  <script>
+  <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+    // Configure environment for GitHub Pages & remote model fetching
+    env.allowLocalModels = false;
+    if (env.backends?.onnx) {
+      env.backends.onnx.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/";
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       const mediaFileInput = document.getElementById("media-file");
       const languageSelect = document.getElementById("language");
@@ -255,65 +263,18 @@
         }
       }
 
-      // Safe Pipeline Resolver with Multi-CDN Fallbacks
-      async function getPipeline() {
-        const existingLib = window.transformers || window.Transformers;
-        if (existingLib?.pipeline) return existingLib;
-
-        const cdnUrls = [
-          "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js",
-          "https://unpkg.com/@xenova/transformers@2.17.2/dist/transformers.min.js"
-        ];
-
-        for (const url of cdnUrls) {
-          try {
-            await new Promise((resolve, reject) => {
-              const script = document.createElement("script");
-              script.src = url;
-              script.crossOrigin = "anonymous";
-              script.onload = () => {
-                const lib = window.transformers || window.Transformers;
-                if (lib?.pipeline) resolve(lib);
-                else reject(new Error("Pipeline not found"));
-              };
-              script.onerror = () => reject(new Error(`Failed to load ${url}`));
-              document.head.appendChild(script);
-            });
-
-            const lib = window.transformers || window.Transformers;
-            if (lib?.pipeline) return lib;
-          } catch (err) {
-            console.warn(err.message);
-          }
-        }
-
-        throw new Error("Failed to initialize Transformers library from all available CDNs.");
-      }
-
       async function extractSpeechFromAudioBuffer(file) {
         setStatus("Loading in-browser Whisper AI pipeline...", "text-blue-700");
-        const lib = await getPipeline();
-        
-        // Environment settings for GitHub Pages & remote Hugging Face model fetching
-        if (lib.env) {
-          lib.env.allowLocalModels = false;
-          if (lib.env.backends?.onnx) {
-            lib.env.backends.onnx.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/";
-          }
-        }
-
         const modelName = languageSelect.value;
-        const transcriber = await lib.pipeline('automatic-speech-recognition', modelName);
+        const transcriber = await pipeline('automatic-speech-recognition', modelName);
 
         setStatus("Decoding and resampling audio to 16kHz mono...", "text-blue-700");
         const arrayBuffer = await file.arrayBuffer();
         
-        // Step 1: Decode at native browser rate
         const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
         const decodedBuffer = await tempCtx.decodeAudioData(arrayBuffer);
         await tempCtx.close();
 
-        // Step 2: Resample to 16kHz using OfflineAudioContext
         const targetRate = 16000;
         const offlineCtx = new OfflineAudioContext(
           1,
