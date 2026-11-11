@@ -287,14 +287,34 @@
         const modelName = languageSelect.value;
         const transcriber = await lib.pipeline('automatic-speech-recognition', modelName);
 
-        setStatus("Decoding audio stream to 16kHz float array...", "text-blue-700");
+        setStatus("Decoding and resampling audio to 16kHz mono...", "text-blue-700");
         const arrayBuffer = await file.arrayBuffer();
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        const rawAudio = audioBuffer.getChannelData(0);
+        
+        // Step 1: Decode at native browser rate
+        const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const decodedBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+        await tempCtx.close();
+
+        // Step 2: Resample to 16kHz using OfflineAudioContext
+        const targetRate = 16000;
+        const offlineCtx = new OfflineAudioContext(
+          1,
+          Math.ceil(decodedBuffer.duration * targetRate),
+          targetRate
+        );
+        const source = offlineCtx.createBufferSource();
+        source.buffer = decodedBuffer;
+        source.connect(offlineCtx.destination);
+        source.start(0);
+        const resampledBuffer = await offlineCtx.startRendering();
+        const rawAudio = resampledBuffer.getChannelData(0);
 
         setStatus("Transcribing spoken words locally...", "text-blue-700");
-        const output = await transcriber(rawAudio, { return_timestamps: true });
+        const output = await transcriber(rawAudio, { 
+          return_timestamps: true,
+          chunk_length_s: 30,
+          stride_length_s: 5
+        });
 
         if (!output || !output.chunks) return [];
 
