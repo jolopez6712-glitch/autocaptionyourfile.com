@@ -21,8 +21,6 @@
     @keyframes fall { to { transform:translate(var(--drift),230px) rotate(680deg); opacity:0; } }
   </style>
   <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
-  <!-- Primary CDN for Transformers.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
 </head>
 <body class="app-shell" style="background: rgb(245, 243, 235);">
   <div class="w-full">
@@ -136,9 +134,13 @@
     </main>
   </div>
 
-  <script>
+  <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+
+    env.allowLocalModels = false;
+
     document.addEventListener("DOMContentLoaded", () => {
-      // 1. Immediate File Update Tracker
+      // 1. Real-time File Update Tracker
       const fileLastModified = new Date(document.lastModified);
       const timerEl = document.getElementById("uptime-timer");
 
@@ -295,38 +297,10 @@
         }
       }
 
-      // Safe Pipeline Resolver with multi-CDN fallbacks
-      async function getPipeline() {
-        const lib = window.transformers || window.Transformers;
-        if (lib?.pipeline) return lib;
-
-        return new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://unpkg.com/@xenova/transformers@2.17.2/dist/transformers.min.js";
-          script.crossOrigin = "anonymous";
-          script.onload = () => {
-            const loadedLib = window.transformers || window.Transformers;
-            if (loadedLib?.pipeline) resolve(loadedLib);
-            else reject(new Error("Pipeline not found on library object"));
-          };
-          script.onerror = () => reject(new Error("Failed to load Transformers CDN script."));
-          document.head.appendChild(script);
-        });
-      }
-
       async function extractSpeechFromAudioBuffer(file) {
         setStatus("Loading in-browser Whisper AI pipeline...", "text-blue-700");
-        const lib = await getPipeline();
-        
-        if (lib.env) {
-          lib.env.allowLocalModels = false;
-          if (lib.env.backends?.onnx) {
-            lib.env.backends.onnx.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/";
-          }
-        }
-
         const modelName = languageSelect.value;
-        const transcriber = await lib.pipeline('automatic-speech-recognition', modelName);
+        const transcriber = await pipeline('automatic-speech-recognition', modelName);
 
         setStatus("Decoding and resampling audio to 16kHz mono...", "text-blue-700");
         const arrayBuffer = await file.arrayBuffer();
