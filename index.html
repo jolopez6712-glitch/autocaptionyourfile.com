@@ -351,8 +351,25 @@
           canvas.width = isVideo && mediaEl.videoWidth ? mediaEl.videoWidth : 1280;
           canvas.height = isVideo && mediaEl.videoHeight ? mediaEl.videoHeight : 720;
 
+          mediaEl.pause();
+          mediaEl.currentTime = 0;
+
           const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const sourceNode = audioCtx.createMediaElementSource(mediaEl);
+          let sourceNode;
+          try {
+            sourceNode = audioCtx.createMediaElementSource(mediaEl);
+          } catch (e) {
+            const clonedEl = mediaEl.cloneNode(true);
+            mediaEl.parentNode.replaceChild(clonedEl, mediaEl);
+            activeMediaEl = clonedEl;
+            if (isVideo) {
+              videoPreview = clonedEl;
+            } else {
+              audioPreview = clonedEl;
+            }
+            sourceNode = audioCtx.createMediaElementSource(clonedEl);
+          }
+
           const destNode = audioCtx.createMediaStreamDestination();
           sourceNode.connect(destNode);
           sourceNode.connect(audioCtx.destination);
@@ -382,20 +399,22 @@
             resultPreview.src = videoBlobUrl;
             resultPreview.classList.remove("hidden");
 
+            audioCtx.close().catch(() => {});
             resolve();
           };
 
-          mediaEl.currentTime = 0;
-          mediaEl.play();
+          activeMediaEl.currentTime = 0;
+          activeMediaEl.play();
           mediaRecorder.start();
 
           function drawFrame() {
-            if (!isProcessing || mediaEl.ended || mediaEl.paused) {
+            const currentMediaEl = activeMediaEl;
+            if (!isProcessing || currentMediaEl.ended || currentMediaEl.paused) {
               if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
               return;
             }
 
-            const currentTime = mediaEl.currentTime;
+            const currentTime = currentMediaEl.currentTime;
 
             if (mediaDuration > 0) {
               const pct = Math.min(100, Math.round((currentTime / mediaDuration) * 100));
@@ -403,7 +422,7 @@
             }
 
             if (isVideo) {
-              ctx.drawImage(mediaEl, 0, 0, canvas.width, canvas.height);
+              ctx.drawImage(currentMediaEl, 0, 0, canvas.width, canvas.height);
             } else {
               ctx.fillStyle = "#000000";
               ctx.fillRect(0, 0, canvas.width, canvas.height);
