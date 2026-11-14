@@ -154,4 +154,719 @@
                 <input id="want-video" type="checkbox" checked class="mt-1 h-5 w-5 accent-[#334f32]">
                 <span>
                   <span class="block font-bold text-[#182722]">Video with Burnt-in Captions (.webm)</span>
-                  <span class="block text-sm text-[#61716a]">Bakes wrapped text onto
+                  <span class="block text-sm text-[#61716a]">Bakes wrapped text onto video. Audio files produce black video with white text.</span>
+                </span>
+              </label>
+              <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#d9ddd3] p-4 bg-[#f9fbf7]">
+                <input id="filter-music" type="checkbox" checked class="mt-1 h-5 w-5 accent-[#334f32]">
+                <span>
+                  <span class="block font-bold text-[#182722]">Aggressive Music &amp; Lyric Filter</span>
+                  <span class="block text-sm text-[#61716a]">Strips out musical audio tags and background vocal hallucinations.</span>
+                </span>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <aside>
+          <section class="surface relative overflow-hidden rounded-3xl p-5 md:p-7" style="background: rgb(255, 254, 250);">
+            <div id="confetti" class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true"></div>
+            <h2 class="mb-2 text-xl font-bold text-[#182722]">Automatic Processing</h2>
+            <p class="mb-5 text-sm text-[#61716a]">Extracts spoken dialogue and bakes synchronized subtitles.</p>
+
+            <div class="flex flex-wrap gap-3">
+              <button id="start-button" type="button" class="rounded-xl bg-[#182722] px-6 py-3 font-bold text-white hover:bg-[#31493a]">Transcribe &amp; Export →</button>
+              <button id="stop-button" type="button" class="hidden rounded-xl border border-[#b96a5d] px-6 py-3 font-bold text-[#923d32] hover:bg-[#fff0eb]">Cancel</button>
+            </div>
+
+            <div id="progress-wrap" class="mt-5 hidden">
+              <div class="h-2 overflow-hidden rounded-full bg-[#e2e8d9]">
+                <div id="progress-bar" class="h-full w-0 rounded-full bg-[#759a42] transition-[width] duration-300"></div>
+              </div>
+              <p id="progress-text" class="mt-2 text-sm text-[#53645a]"></p>
+            </div>
+
+            <p id="status" class="mt-4 min-h-6 text-sm font-semibold text-[#425d42]" role="status" aria-live="polite"></p>
+
+            <div id="downloads" class="mt-4 hidden flex flex-col gap-3">
+              <a id="download-srt" class="hidden text-center rounded-xl bg-[#d8ef71] px-4 py-3 font-bold text-[#182722] hover:bg-[#c5e75a]">Download Subtitles (.srt)</a>
+              <a id="download-video" class="hidden text-center rounded-xl bg-[#182722] px-4 py-3 font-bold text-white hover:bg-[#31493a]">Download Captioned Video (.webm)</a>
+            </div>
+
+            <video id="result-preview" class="mt-5 hidden max-h-80 w-full rounded-2xl bg-[#17221e] object-contain" controls playsinline></video>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <footer class="border-t border-[#d9ddd3] px-5 py-5 md:px-10">
+    <p class="mx-auto max-w-5xl text-center text-xs leading-relaxed text-[#61716a]">
+      <strong>Note:</strong> Whisper AI transcription is not 100% accurate and may occasionally mishear words, names, or punctuation. Generated captions should not be solely relied upon and should always be reviewed and revised before publishing or official use.
+    </p>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. Real-time File Update Tracker
+      const fileLastModified = new Date(document.lastModified);
+      const timerEl = document.getElementById("uptime-timer");
+
+      function updateFileAgeTimer() {
+        const now = new Date();
+        const diffMs = now - fileLastModified;
+
+        if (diffMs < 0 || isNaN(diffMs)) {
+          timerEl.textContent = "Just now";
+          return;
+        }
+
+        const totalSecs = Math.floor(diffMs / 1000);
+        const days = Math.floor(totalSecs / 86400);
+        const hours = Math.floor((totalSecs % 86400) / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+
+        let timeString = "";
+        if (days > 0) timeString += `${days}d `;
+        if (days > 0 || hours > 0) timeString += `${hours}h `;
+        if (days > 0 || hours > 0 || mins > 0) timeString += `${mins}m `;
+        timeString += `${secs}s ago`;
+
+        timerEl.textContent = timeString;
+      }
+
+      updateFileAgeTimer();
+      setInterval(updateFileAgeTimer, 1000);
+
+      // 2. App DOM Elements & State
+      const modelBadge = document.getElementById("model-badge");
+      const mediaFileInput = document.getElementById("media-file");
+      const modelSelect = document.getElementById("model-select");
+      const spokenLanguageSelect = document.getElementById("spoken-language");
+      const taskModeSelect = document.getElementById("task-mode");
+      const modelHintEl = document.getElementById("model-hint");
+
+      const previewWrap = document.getElementById("preview-wrap");
+      let videoPreview = document.getElementById("video-preview");
+      let audioPreview = document.getElementById("audio-preview");
+      const mediaDetails = document.getElementById("media-details");
+
+      const wantSrtCheckbox = document.getElementById("want-srt");
+      const wantVideoCheckbox = document.getElementById("want-video");
+      const filterMusicCheckbox = document.getElementById("filter-music");
+
+      const startBtn = document.getElementById("start-button");
+      const stopBtn = document.getElementById("stop-button");
+      const progressWrap = document.getElementById("progress-wrap");
+      const progressBar = document.getElementById("progress-bar");
+      const progressText = document.getElementById("progress-text");
+      const statusEl = document.getElementById("status");
+
+      const downloadsWrap = document.getElementById("downloads");
+      const downloadSrtLink = document.getElementById("download-srt");
+      const downloadVideoLink = document.getElementById("download-video");
+      const resultPreview = document.getElementById("result-preview");
+      const confettiContainer = document.getElementById("confetti");
+
+      const MODEL_CONFIGS = {
+        "onnx-community/whisper-large-v3-turbo": {
+          multilingual: true,
+          webgpuDtype: { encoder_model: "fp16", decoder_model_merged: "q4" },
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-medium": {
+          multilingual: true,
+          webgpuDtype: "q8",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-small": {
+          multilingual: true,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-base": {
+          multilingual: true,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-tiny": {
+          multilingual: true,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-base.en": {
+          multilingual: false,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-tiny.en": {
+          multilingual: false,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        }
+      };
+
+      let selectedFile = null;
+      let activeMediaEl = null;
+      let mediaDuration = 0;
+      let isProcessing = false;
+      let mediaRecorder = null;
+      let recordedChunks = [];
+      let srtBlobUrl = null;
+      let videoBlobUrl = null;
+
+      // Pipeline cache so repeated transcriptions don't reload the model
+      let transformersModule = null;
+      let cachedTranscriber = null;
+      let cachedModelKey = null;
+      let preferredDevice = "wasm";
+
+      detectHardwareAcceleration();
+      syncModelControls();
+
+      modelSelect.addEventListener("change", syncModelControls);
+      mediaFileInput.addEventListener("change", handleFileSelect);
+      startBtn.addEventListener("click", startAutomaticProcess);
+      stopBtn.addEventListener("click", cancelProcessing);
+
+      async function detectHardwareAcceleration() {
+        if (navigator.gpu) {
+          try {
+            const adapter = await navigator.gpu.requestAdapter();
+            if (adapter) {
+              preferredDevice = "webgpu";
+              modelBadge.textContent = "Ready · WebGPU Accelerated";
+              return;
+            }
+          } catch (_) {}
+        }
+        preferredDevice = "wasm";
+        modelBadge.textContent = "Ready · Browser WASM";
+      }
+
+      function syncModelControls() {
+        const modelName = modelSelect.value;
+        const cfg = MODEL_CONFIGS[modelName] || { multilingual: true };
+
+        if (!cfg.multilingual) {
+          spokenLanguageSelect.value = "english";
+          spokenLanguageSelect.disabled = true;
+          taskModeSelect.value = "transcribe";
+          taskModeSelect.disabled = true;
+          modelHintEl.textContent = "English-only model selected. Switch to a Multilingual model to transcribe other languages or translate to English.";
+        } else {
+          if (spokenLanguageSelect.disabled) {
+            spokenLanguageSelect.value = "auto";
+          }
+          spokenLanguageSelect.disabled = false;
+          taskModeSelect.disabled = false;
+          modelHintEl.textContent = "Tip: Choose a specific Spoken Language if auto-detect struggles with short clips, music, or regional accents.";
+        }
+      }
+
+      function handleFileSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        selectedFile = file;
+        const fileUrl = URL.createObjectURL(file);
+        const isVideo = file.type.startsWith("video/");
+
+        previewWrap.classList.remove("hidden");
+        videoPreview.classList.add("hidden");
+        audioPreview.classList.add("hidden");
+
+        if (isVideo) {
+          activeMediaEl = videoPreview;
+          videoPreview.src = fileUrl;
+          videoPreview.classList.remove("hidden");
+        } else {
+          activeMediaEl = audioPreview;
+          audioPreview.src = fileUrl;
+          audioPreview.classList.remove("hidden");
+        }
+
+        activeMediaEl.onloadedmetadata = () => {
+          mediaDuration = activeMediaEl.duration;
+          const mins = Math.floor(mediaDuration / 60);
+          const secs = Math.floor(mediaDuration % 60);
+          mediaDetails.textContent = `File: ${file.name} | Type: ${file.type || "audio/video"} | Duration: ${mins}m ${secs}s`;
+        };
+      }
+
+      async function startAutomaticProcess() {
+        if (!selectedFile) {
+          setStatus("Please select an audio or video file first.", "text-red-600");
+          return;
+        }
+
+        const wantSrt = wantSrtCheckbox.checked;
+        const wantVideo = wantVideoCheckbox.checked;
+
+        if (!wantSrt && !wantVideo) {
+          setStatus("Please select at least one output option.", "text-red-600");
+          return;
+        }
+
+        isProcessing = true;
+        startBtn.disabled = true;
+        stopBtn.classList.remove("hidden");
+        progressWrap.classList.remove("hidden");
+        downloadsWrap.classList.add("hidden");
+        downloadSrtLink.classList.add("hidden");
+        downloadVideoLink.classList.add("hidden");
+        resultPreview.classList.add("hidden");
+        setStatus("");
+
+        try {
+          updateProgress(10, "Preparing Whisper AI model...");
+          const spokenCues = await extractSpeechFromAudioBuffer(selectedFile);
+
+          if (!isProcessing) throw new Error("Cancelled");
+
+          if (!spokenCues || spokenCues.length === 0) {
+            throw new Error("No spoken dialogue detected in file.");
+          }
+
+          if (wantSrt) {
+            updateProgress(80, "Generating UTF-8 SRT subtitle file...");
+            const srtContent = buildSrtString(spokenCues);
+            if (srtBlobUrl) URL.revokeObjectURL(srtBlobUrl);
+            const srtBlob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+            srtBlobUrl = URL.createObjectURL(srtBlob);
+
+            const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
+            downloadSrtLink.href = srtBlobUrl;
+            downloadSrtLink.download = `${baseName}_auto.srt`;
+            downloadSrtLink.classList.remove("hidden");
+          }
+
+          if (wantVideo) {
+            updateProgress(85, "Baking captions into video output...");
+            await renderVideoWithCaptions(spokenCues);
+          }
+
+          finishProcessing(true);
+        } catch (err) {
+          if (err.message !== "Cancelled") {
+            setStatus("Transcription error: " + err.message, "text-red-600");
+          }
+          finishProcessing(false);
+        }
+      }
+
+      async function getTranscriber(modelName) {
+        if (!transformersModule) {
+          transformersModule = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3");
+          transformersModule.env.allowLocalModels = false;
+        }
+
+        const cacheKey = `${modelName}::${preferredDevice}`;
+        if (cachedTranscriber && cachedModelKey === cacheKey) {
+          return cachedTranscriber;
+        }
+
+        const cfg = MODEL_CONFIGS[modelName] || {
+          multilingual: true,
+          webgpuDtype: "q8",
+          wasmDtype: "q8"
+        };
+
+        const fileProgressMap = new Map();
+        const progressCallback = (info) => {
+          if (info.status === "progress" && info.file) {
+            fileProgressMap.set(info.file, {
+              loaded: info.loaded || 0,
+              total: info.total || 0
+            });
+            let totalLoaded = 0;
+            let totalBytes = 0;
+            fileProgressMap.forEach((v) => {
+              totalLoaded += v.loaded;
+              totalBytes += v.total;
+            });
+            if (totalBytes > 0) {
+              const pct = Math.min(60, Math.round((totalLoaded / totalBytes) * 60));
+              const mbLoaded = (totalLoaded / 1048576).toFixed(1);
+              const mbTotal = (totalBytes / 1048576).toFixed(1);
+              updateProgress(pct, `Downloading model weights (${mbLoaded} / ${mbTotal} MB)...`);
+            }
+          } else if (info.status === "ready") {
+            updateProgress(62, "Model weights loaded into memory.");
+          }
+        };
+
+        try {
+          const deviceToUse = preferredDevice;
+          const dtypeToUse = deviceToUse === "webgpu" ? cfg.webgpuDtype : cfg.wasmDtype;
+          setStatus(`Loading ${modelName} (${deviceToUse.toUpperCase()})...`, "text-blue-700");
+
+          cachedTranscriber = await transformersModule.pipeline(
+            "automatic-speech-recognition",
+            modelName,
+            {
+              device: deviceToUse,
+              dtype: dtypeToUse,
+              progress_callback: progressCallback
+            }
+          );
+          cachedModelKey = cacheKey;
+          return cachedTranscriber;
+        } catch (webgpuErr) {
+          if (preferredDevice === "webgpu") {
+            preferredDevice = "wasm";
+            modelBadge.textContent = "Ready · Browser WASM";
+            setStatus(`Falling back to WASM CPU for ${modelName}...`, "text-blue-700");
+
+            cachedTranscriber = await transformersModule.pipeline(
+              "automatic-speech-recognition",
+              modelName,
+              {
+                device: "wasm",
+                dtype: cfg.wasmDtype,
+                progress_callback: progressCallback
+              }
+            );
+            cachedModelKey = `${modelName}::wasm`;
+            return cachedTranscriber;
+          }
+          throw webgpuErr;
+        }
+      }
+
+      async function extractSpeechFromAudioBuffer(file) {
+        const modelName = modelSelect.value;
+        const cfg = MODEL_CONFIGS[modelName] || { multilingual: true };
+        const transcriber = await getTranscriber(modelName);
+
+        if (!isProcessing) throw new Error("Cancelled");
+
+        updateProgress(65, "Decoding and resampling audio to 16kHz mono...");
+        setStatus("Decoding and resampling audio to 16kHz mono...", "text-blue-700");
+        const arrayBuffer = await file.arrayBuffer();
+
+        const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const decodedBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+        await tempCtx.close();
+
+        if (!mediaDuration || isNaN(mediaDuration)) {
+          mediaDuration = decodedBuffer.duration;
+        }
+
+        const targetRate = 16000;
+        const offlineCtx = new OfflineAudioContext(
+          1,
+          Math.ceil(decodedBuffer.duration * targetRate),
+          targetRate
+        );
+        const source = offlineCtx.createBufferSource();
+        source.buffer = decodedBuffer;
+        source.connect(offlineCtx.destination);
+        source.start(0);
+        const resampledBuffer = await offlineCtx.startRendering();
+        const rawAudio = resampledBuffer.getChannelData(0);
+
+        if (!isProcessing) throw new Error("Cancelled");
+
+        const selectedLang = spokenLanguageSelect.value;
+        const selectedTask = taskModeSelect.value;
+        const langLabel = cfg.multilingual
+          ? (selectedLang === "auto" ? "auto-detected language" : selectedLang)
+          : "English";
+
+        updateProgress(72, `Transcribing (${langLabel})...`);
+        setStatus(`Running Whisper AI (${langLabel})...`, "text-blue-700");
+
+        const transcriptionOptions = {
+          return_timestamps: true,
+          chunk_length_s: 30,
+          stride_length_s: 5
+        };
+
+        if (cfg.multilingual) {
+          transcriptionOptions.task = selectedTask;
+          if (selectedLang !== "auto") {
+            transcriptionOptions.language = selectedLang;
+          }
+        }
+
+        if (filterMusicCheckbox.checked) {
+          transcriptionOptions.temperature = 0.0;
+          transcriptionOptions.no_speech_threshold = 0.55;
+          transcriptionOptions.condition_on_previous_text = false;
+        }
+
+        const output = await transcriber(rawAudio, transcriptionOptions);
+
+        if (!output || !output.chunks) return [];
+
+        return output.chunks
+          .map((chunk) => {
+            let text = chunk.text.trim();
+            if (filterMusicCheckbox.checked) {
+              text = text.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
+            }
+            const startSec = chunk.timestamp[0] ?? 0;
+            const rawEndSec = chunk.timestamp[1] ?? Math.max(startSec + 2, mediaDuration);
+            const endSec = mediaDuration > 0 ? Math.min(mediaDuration, rawEndSec) : rawEndSec;
+
+            return {
+              startMs: startSec * 1000,
+              endMs: endSec * 1000,
+              startSec,
+              endSec,
+              text
+            };
+          })
+          .filter((c) => c.text.length > 0);
+      }
+
+      function renderVideoWithCaptions(cues) {
+        return new Promise((resolve, reject) => {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+
+          const isVideo = selectedFile.type.startsWith("video/");
+          const mediaEl = activeMediaEl;
+
+          canvas.width = isVideo && mediaEl.videoWidth ? mediaEl.videoWidth : 1280;
+          canvas.height = isVideo && mediaEl.videoHeight ? mediaEl.videoHeight : 720;
+
+          mediaEl.pause();
+          mediaEl.currentTime = 0;
+
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          let sourceNode;
+          try {
+            sourceNode = audioCtx.createMediaElementSource(mediaEl);
+          } catch (e) {
+            const clonedEl = mediaEl.cloneNode(true);
+            mediaEl.parentNode.replaceChild(clonedEl, mediaEl);
+            activeMediaEl = clonedEl;
+            if (isVideo) {
+              videoPreview = clonedEl;
+            } else {
+              audioPreview = clonedEl;
+            }
+            sourceNode = audioCtx.createMediaElementSource(clonedEl);
+          }
+
+          const destNode = audioCtx.createMediaStreamDestination();
+          sourceNode.connect(destNode);
+          sourceNode.connect(audioCtx.destination);
+
+          const canvasStream = canvas.captureStream(30);
+          destNode.stream.getAudioTracks().forEach((track) => canvasStream.addTrack(track));
+
+          mediaRecorder = new MediaRecorder(canvasStream, { mimeType: "video/webm" });
+          recordedChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            if (!isProcessing) return reject(new Error("Cancelled"));
+
+            if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
+            const videoBlob = new Blob(recordedChunks, { type: "video/webm" });
+            videoBlobUrl = URL.createObjectURL(videoBlob);
+
+            const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
+            downloadVideoLink.href = videoBlobUrl;
+            downloadVideoLink.download = `${baseName}_captioned.webm`;
+            downloadVideoLink.classList.remove("hidden");
+
+            resultPreview.src = videoBlobUrl;
+            resultPreview.classList.remove("hidden");
+
+            audioCtx.close().catch(() => {});
+            resolve();
+          };
+
+          activeMediaEl.currentTime = 0;
+          activeMediaEl.play();
+          mediaRecorder.start();
+
+          function drawFrame() {
+            const currentMediaEl = activeMediaEl;
+            const currentTime = currentMediaEl.currentTime;
+
+            if (!isProcessing || currentMediaEl.ended || currentMediaEl.paused || (mediaDuration > 0 && currentTime >= mediaDuration)) {
+              currentMediaEl.pause();
+              if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+              return;
+            }
+
+            if (mediaDuration > 0) {
+              const pct = Math.min(100, Math.round((currentTime / mediaDuration) * 100));
+              updateProgress(pct, `Rendering burnt-in video... ${pct}%`);
+            }
+
+            if (isVideo) {
+              ctx.drawImage(currentMediaEl, 0, 0, canvas.width, canvas.height);
+            } else {
+              ctx.fillStyle = "#000000";
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            const activeCue = cues.find((c) => currentTime >= c.startSec && currentTime <= c.endSec);
+            if (activeCue) {
+              drawCaptionOverlay(ctx, activeCue.text, canvas.width, canvas.height);
+            }
+
+            requestAnimationFrame(drawFrame);
+          }
+
+          requestAnimationFrame(drawFrame);
+        });
+      }
+
+      // Wraps both space-separated text and continuous CJK strings to fit inside the video frame
+      function wrapCaptionLines(ctx, text, maxWidth) {
+        const paragraphs = text.split("\n");
+        const wrappedLines = [];
+
+        paragraphs.forEach((paragraph) => {
+          const tokens = paragraph.includes(" ") ? paragraph.split(/\s+/) : Array.from(paragraph);
+          const joiner = paragraph.includes(" ") ? " " : "";
+          let currentLine = "";
+
+          tokens.forEach((token) => {
+            const candidate = currentLine ? `${currentLine}${joiner}${token}` : token;
+            if (ctx.measureText(candidate).width <= maxWidth || !currentLine) {
+              currentLine = candidate;
+            } else {
+              wrappedLines.push(currentLine);
+              currentLine = token;
+            }
+          });
+
+          if (currentLine) wrappedLines.push(currentLine);
+        });
+
+        return wrappedLines;
+      }
+
+      function drawCaptionOverlay(ctx, text, width, height) {
+        const fontSize = Math.max(22, Math.floor(height * 0.048));
+        ctx.font = `700 ${fontSize}px "DM Sans", sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const maxTextWidth = width * 0.84;
+        const lines = wrapCaptionLines(ctx, text, maxTextWidth);
+        const padding = fontSize * 0.65;
+        const lineHeight = fontSize * 1.35;
+
+        let maxLineWidth = 0;
+        lines.forEach((line) => {
+          const w = ctx.measureText(line).width;
+          if (w > maxLineWidth) maxLineWidth = w;
+        });
+
+        const boxWidth = Math.min(width * 0.92, maxLineWidth + padding * 2);
+        const boxHeight = lines.length * lineHeight + padding;
+        const boxX = (width - boxWidth) / 2;
+        const boxY = height - boxHeight - height * 0.08;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 10);
+        } else {
+          ctx.rect(boxX, boxY, boxWidth, boxHeight);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = "#FFFFFF";
+        lines.forEach((line, idx) => {
+          const lineY = boxY + padding * 0.5 + idx * lineHeight + lineHeight / 2;
+          ctx.fillText(line, width / 2, lineY);
+        });
+      }
+
+      function buildSrtString(cues) {
+        return cues
+          .map((cue, index) => {
+            const startFormatted = formatMsToSrtTime(cue.startMs);
+            const endFormatted = formatMsToSrtTime(cue.endMs);
+            return `${index + 1}\n${startFormatted} --> ${endFormatted}\n${cue.text}\n`;
+          })
+          .join("\n");
+      }
+
+      function formatMsToSrtTime(msTotal) {
+        const ms = Math.floor(msTotal % 1000);
+        const totalSecs = Math.floor(msTotal / 1000);
+        const hrs = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
+        const secs = totalSecs % 60;
+
+        return (
+          String(hrs).padStart(2, "0") + ":" +
+          String(mins).padStart(2, "0") + ":" +
+          String(secs).padStart(2, "0") + "," +
+          String(ms).padStart(3, "0")
+        );
+      }
+
+      function updateProgress(percent, text) {
+        progressBar.style.width = `${percent}%`;
+        progressText.textContent = text;
+      }
+
+      function finishProcessing(success) {
+        isProcessing = false;
+        startBtn.disabled = false;
+        stopBtn.classList.add("hidden");
+        progressWrap.classList.add("hidden");
+
+        if (success) {
+          downloadsWrap.classList.remove("hidden");
+          setStatus("Speech transcription & export complete!", "text-green-700");
+          triggerConfetti();
+        }
+      }
+
+      function cancelProcessing() {
+        isProcessing = false;
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+        if (activeMediaEl) {
+          activeMediaEl.pause();
+          activeMediaEl.currentTime = 0;
+        }
+        setStatus("Process cancelled.", "text-amber-700");
+        finishProcessing(false);
+      }
+
+      function setStatus(message, textClass = "text-[#425d42]") {
+        statusEl.className = `mt-4 min-h-6 text-sm font-semibold ${textClass}`;
+        statusEl.textContent = message;
+      }
+
+      function triggerConfetti() {
+        confettiContainer.innerHTML = "";
+        const colors = ["#d8ef71", "#759a42", "#182722", "#cbd2c8"];
+
+        for (let i = 0; i < 25; i++) {
+          const piece = document.createElement("div");
+          piece.className = "confetti-piece";
+          piece.style.left = `${Math.random() * 100}%`;
+          piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 150}px`);
+          piece.style.animationDelay = `${Math.random() * 0.4}s`;
+          confettiContainer.appendChild(piece);
+        }
+
+        setTimeout(() => {
+          confettiContainer.innerHTML = "";
+        }, 2500);
+      }
+    });
+  </script>
+</body>
+</html>
