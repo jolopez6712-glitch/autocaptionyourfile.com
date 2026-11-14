@@ -13,6 +13,7 @@
     .app-shell { width:100%; min-height:100vh; background:radial-gradient(circle at 88% 4%,#e6ebd8 0,transparent 32%),var(--paper); }
     .surface { background:#fffefa; border:1px solid var(--line); box-shadow:0 12px 32px #243a2710; }
     .field { width:100%; min-width:0; border:1px solid #cbd2c8; background:#fff; border-radius:12px; padding:11px 13px; color:var(--ink); }
+    .field:disabled { background:#f3f5f0; color:#7a8881; cursor:not-allowed; }
     .field:focus,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid #93ad3e; outline-offset:2px; }
     button { transition:transform .16s ease,background .16s ease,opacity .16s ease; cursor:pointer; }
     button:not(:disabled):hover { transform:translateY(-2px); }
@@ -38,15 +39,15 @@
             Updated: <span id="uptime-timer" class="font-bold text-[#182722]">Calculating...</span>
           </div>
         </div>
-        <span id="model-badge" class="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-green-800 text-sm font-semibold">Ready for Client-Side AI</span>
+        <span id="model-badge" class="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-green-800 text-sm font-semibold">Checking Client-Side AI...</span>
       </div>
     </header>
 
     <main class="mx-auto max-w-5xl px-5 py-9 md:px-10 md:py-12">
       <div class="mb-9 max-w-3xl">
-        <p class="mb-3 font-bold uppercase tracking-[.2em] text-[#607448] text-sm">CLIENT-SIDE SPEECH RECOGNITION</p>
+        <p class="mb-3 font-bold uppercase tracking-[.2em] text-[#607448] text-sm">CLIENT-SIDE MULTILINGUAL SPEECH RECOGNITION</p>
         <h1 class="leading-tight text-[#182722] text-3xl font-bold">Automatic Captions &amp; Video Generator</h1>
-        <p class="mt-4 leading-relaxed text-[#53645a] text-base">Upload an audio or video file. Whisper AI processes the raw audio bytes directly inside your browser to extract actual spoken words, build timed SRT subtitles, and export burnt-in captioned videos.</p>
+        <p class="mt-4 leading-relaxed text-[#53645a] text-base">Upload an audio or video file. Whisper AI processes raw audio directly inside your browser across 99 languages to build timed SRT subtitles and export burnt-in captioned videos.</p>
       </div>
 
       <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)]">
@@ -54,20 +55,78 @@
           <section class="surface rounded-3xl p-5 md:p-7" style="background: rgb(255, 254, 250);">
             <div class="mb-5 flex items-center gap-3">
               <span class="grid h-8 w-8 place-items-center rounded-full bg-[#d8ef71] font-bold">01</span>
-              <h2 class="text-xl font-bold text-[#182722]">Media Upload</h2>
+              <h2 class="text-xl font-bold text-[#182722]">Media &amp; Model Setup</h2>
             </div>
+
             <div class="grid gap-4 sm:grid-cols-2">
-              <div>
+              <div class="sm:col-span-2">
                 <label class="mb-2 block font-semibold text-[#182722]" for="media-file">Audio or Video File</label>
                 <input id="media-file" class="field" type="file" accept="audio/*,video/*">
               </div>
+
               <div>
-                <label class="mb-2 block font-semibold text-[#182722]" for="language">Speech Model</label>
-                <select id="language" class="field">
-                  <option value="Xenova/whisper-tiny.en">English (Whisper Tiny)</option>
-                  <option value="Xenova/whisper-tiny">Multilingual (Whisper Tiny)</option>
-                  <option value="Xenova/whisper-base.en">English High Accuracy (Whisper Base)</option>
+                <label class="mb-2 block font-semibold text-[#182722]" for="model-select">Speech Model</label>
+                <select id="model-select" class="field">
+                  <optgroup label="Multilingual (99 Languages)">
+                    <option value="Xenova/whisper-small" selected>Multilingual · Whisper Small (~250 MB · Recommended)</option>
+                    <option value="onnx-community/whisper-large-v3-turbo">Multilingual · Whisper Large v3 Turbo (~600 MB · Best)</option>
+                    <option value="Xenova/whisper-medium">Multilingual · Whisper Medium (~750 MB · High Accuracy)</option>
+                    <option value="Xenova/whisper-base">Multilingual · Whisper Base (~75 MB · Fast)</option>
+                    <option value="Xenova/whisper-tiny">Multilingual · Whisper Tiny (~40 MB · Ultra-Light)</option>
+                  </optgroup>
+                  <optgroup label="English Only">
+                    <option value="Xenova/whisper-base.en">English Only · Whisper Base.en (~75 MB)</option>
+                    <option value="Xenova/whisper-tiny.en">English Only · Whisper Tiny.en (~40 MB)</option>
+                  </optgroup>
                 </select>
+              </div>
+
+              <div>
+                <label class="mb-2 block font-semibold text-[#182722]" for="spoken-language">Spoken Language</label>
+                <select id="spoken-language" class="field">
+                  <option value="auto" selected>Auto-Detect Language</option>
+                  <option value="english">English</option>
+                  <option value="spanish">Spanish (Español)</option>
+                  <option value="french">French (Français)</option>
+                  <option value="german">German (Deutsch)</option>
+                  <option value="portuguese">Portuguese (Português)</option>
+                  <option value="italian">Italian (Italiano)</option>
+                  <option value="japanese">Japanese (日本語)</option>
+                  <option value="korean">Korean (한국어)</option>
+                  <option value="chinese">Chinese (中文)</option>
+                  <option value="arabic">Arabic (العربية)</option>
+                  <option value="hindi">Hindi (हिन्दी)</option>
+                  <option value="russian">Russian (Русский)</option>
+                  <option value="ukrainian">Ukrainian (Українська)</option>
+                  <option value="dutch">Dutch (Nederlands)</option>
+                  <option value="polish">Polish (Polski)</option>
+                  <option value="turkish">Turkish (Türkçe)</option>
+                  <option value="vietnamese">Vietnamese (Tiếng Việt)</option>
+                  <option value="thai">Thai (ไทย)</option>
+                  <option value="indonesian">Indonesian (Bahasa Indonesia)</option>
+                  <option value="tagalog">Tagalog / Filipino</option>
+                  <option value="swedish">Swedish (Svenska)</option>
+                  <option value="norwegian">Norwegian (Norsk)</option>
+                  <option value="danish">Danish (Dansk)</option>
+                  <option value="finnish">Finnish (Suomi)</option>
+                  <option value="greek">Greek (Ελληνικά)</option>
+                  <option value="hebrew">Hebrew (עברית)</option>
+                  <option value="czech">Czech (Čeština)</option>
+                  <option value="romanian">Romanian (Română)</option>
+                  <option value="hungarian">Hungarian (Magyar)</option>
+                  <option value="bengali">Bengali (বাংলা)</option>
+                  <option value="urdu">Urdu (اردو)</option>
+                  <option value="swahili">Swahili (Kiswahili)</option>
+                </select>
+              </div>
+
+              <div class="sm:col-span-2">
+                <label class="mb-2 block font-semibold text-[#182722]" for="task-mode">Caption Mode</label>
+                <select id="task-mode" class="field">
+                  <option value="transcribe" selected>Transcribe (Keep Original Spoken Language)</option>
+                  <option value="translate">Translate Speech Directly into English Captions</option>
+                </select>
+                <p id="model-hint" class="mt-2 text-xs text-[#61716a]">Tip: Whisper Small or Large v3 Turbo gives noticeably cleaner punctuation and accuracy on non-English speech.</p>
               </div>
             </div>
 
@@ -88,14 +147,14 @@
                 <input id="want-srt" type="checkbox" checked class="mt-1 h-5 w-5 accent-[#334f32]">
                 <span>
                   <span class="block font-bold text-[#182722]">Timed SRT Subtitle File (.srt)</span>
-                  <span class="block text-sm text-[#61716a]">Export exact spoken text with timestamps.</span>
+                  <span class="block text-sm text-[#61716a]">Export UTF-8 spoken text with exact timestamps.</span>
                 </span>
               </label>
               <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#d9ddd3] p-4">
                 <input id="want-video" type="checkbox" checked class="mt-1 h-5 w-5 accent-[#334f32]">
                 <span>
                   <span class="block font-bold text-[#182722]">Video with Burnt-in Captions (.webm)</span>
-                  <span class="block text-sm text-[#61716a]">Bakes text onto video. Audio files produce black video with white text.</span>
+                  <span class="block text-sm text-[#61716a]">Bakes wrapped text onto video. Audio files produce black video with white text.</span>
                 </span>
               </label>
               <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#d9ddd3] p-4 bg-[#f9fbf7]">
@@ -114,7 +173,7 @@
             <div id="confetti" class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true"></div>
             <h2 class="mb-2 text-xl font-bold text-[#182722]">Automatic Processing</h2>
             <p class="mb-5 text-sm text-[#61716a]">Extracts spoken dialogue and bakes synchronized subtitles.</p>
-            
+
             <div class="flex flex-wrap gap-3">
               <button id="start-button" type="button" class="rounded-xl bg-[#182722] px-6 py-3 font-bold text-white hover:bg-[#31493a]">Transcribe &amp; Export →</button>
               <button id="stop-button" type="button" class="hidden rounded-xl border border-[#b96a5d] px-6 py-3 font-bold text-[#923d32] hover:bg-[#fff0eb]">Cancel</button>
@@ -175,8 +234,13 @@
       setInterval(updateFileAgeTimer, 1000);
 
       // 2. App DOM Elements & State
+      const modelBadge = document.getElementById("model-badge");
       const mediaFileInput = document.getElementById("media-file");
-      const languageSelect = document.getElementById("language");
+      const modelSelect = document.getElementById("model-select");
+      const spokenLanguageSelect = document.getElementById("spoken-language");
+      const taskModeSelect = document.getElementById("task-mode");
+      const modelHintEl = document.getElementById("model-hint");
+
       const previewWrap = document.getElementById("preview-wrap");
       let videoPreview = document.getElementById("video-preview");
       let audioPreview = document.getElementById("audio-preview");
@@ -199,6 +263,44 @@
       const resultPreview = document.getElementById("result-preview");
       const confettiContainer = document.getElementById("confetti");
 
+      const MODEL_CONFIGS = {
+        "onnx-community/whisper-large-v3-turbo": {
+          multilingual: true,
+          webgpuDtype: { encoder_model: "fp16", decoder_model_merged: "q4" },
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-medium": {
+          multilingual: true,
+          webgpuDtype: "q8",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-small": {
+          multilingual: true,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-base": {
+          multilingual: true,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-tiny": {
+          multilingual: true,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-base.en": {
+          multilingual: false,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        },
+        "Xenova/whisper-tiny.en": {
+          multilingual: false,
+          webgpuDtype: "fp32",
+          wasmDtype: "q8"
+        }
+      };
+
       let selectedFile = null;
       let activeMediaEl = null;
       let mediaDuration = 0;
@@ -208,9 +310,54 @@
       let srtBlobUrl = null;
       let videoBlobUrl = null;
 
+      // Pipeline cache so repeated transcriptions don't reload the model
+      let transformersModule = null;
+      let cachedTranscriber = null;
+      let cachedModelKey = null;
+      let preferredDevice = "wasm";
+
+      detectHardwareAcceleration();
+      syncModelControls();
+
+      modelSelect.addEventListener("change", syncModelControls);
       mediaFileInput.addEventListener("change", handleFileSelect);
       startBtn.addEventListener("click", startAutomaticProcess);
       stopBtn.addEventListener("click", cancelProcessing);
+
+      async function detectHardwareAcceleration() {
+        if (navigator.gpu) {
+          try {
+            const adapter = await navigator.gpu.requestAdapter();
+            if (adapter) {
+              preferredDevice = "webgpu";
+              modelBadge.textContent = "Ready · WebGPU Accelerated";
+              return;
+            }
+          } catch (_) {}
+        }
+        preferredDevice = "wasm";
+        modelBadge.textContent = "Ready · Browser WASM";
+      }
+
+      function syncModelControls() {
+        const modelName = modelSelect.value;
+        const cfg = MODEL_CONFIGS[modelName] || { multilingual: true };
+
+        if (!cfg.multilingual) {
+          spokenLanguageSelect.value = "english";
+          spokenLanguageSelect.disabled = true;
+          taskModeSelect.value = "transcribe";
+          taskModeSelect.disabled = true;
+          modelHintEl.textContent = "English-only model selected. Switch to a Multilingual model to transcribe other languages or translate to English.";
+        } else {
+          if (spokenLanguageSelect.disabled) {
+            spokenLanguageSelect.value = "auto";
+          }
+          spokenLanguageSelect.disabled = false;
+          taskModeSelect.disabled = false;
+          modelHintEl.textContent = "Tip: Choose a specific Spoken Language if auto-detect struggles with short clips, music, or regional accents.";
+        }
+      }
 
       function handleFileSelect(e) {
         const file = e.target.files[0];
@@ -231,14 +378,14 @@
         } else {
           activeMediaEl = audioPreview;
           audioPreview.src = fileUrl;
-          audioPreview.classList.add("hidden");
+          audioPreview.classList.remove("hidden");
         }
 
         activeMediaEl.onloadedmetadata = () => {
           mediaDuration = activeMediaEl.duration;
           const mins = Math.floor(mediaDuration / 60);
           const secs = Math.floor(mediaDuration % 60);
-          mediaDetails.textContent = `File: ${file.name} | Type: ${file.type || 'audio/video'} | Duration: ${mins}m ${secs}s`;
+          mediaDetails.textContent = `File: ${file.name} | Type: ${file.type || "audio/video"} | Duration: ${mins}m ${secs}s`;
         };
       }
 
@@ -267,15 +414,17 @@
         setStatus("");
 
         try {
-          updateProgress(20, "Running Whisper AI model on browser audio...");
+          updateProgress(10, "Preparing Whisper AI model...");
           const spokenCues = await extractSpeechFromAudioBuffer(selectedFile);
+
+          if (!isProcessing) throw new Error("Cancelled");
 
           if (!spokenCues || spokenCues.length === 0) {
             throw new Error("No spoken dialogue detected in file.");
           }
 
           if (wantSrt) {
-            updateProgress(70, "Generating SRT subtitle file...");
+            updateProgress(80, "Generating UTF-8 SRT subtitle file...");
             const srtContent = buildSrtString(spokenCues);
             if (srtBlobUrl) URL.revokeObjectURL(srtBlobUrl);
             const srtBlob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
@@ -301,25 +450,103 @@
         }
       }
 
-      // Dynamic Module Loader to prevent startup blocking
-      async function loadTransformersPipeline() {
-        const module = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js');
-        module.env.allowLocalModels = false;
-        return module.pipeline;
+      async function getTranscriber(modelName) {
+        if (!transformersModule) {
+          transformersModule = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3");
+          transformersModule.env.allowLocalModels = false;
+        }
+
+        const cacheKey = `${modelName}::${preferredDevice}`;
+        if (cachedTranscriber && cachedModelKey === cacheKey) {
+          return cachedTranscriber;
+        }
+
+        const cfg = MODEL_CONFIGS[modelName] || {
+          multilingual: true,
+          webgpuDtype: "q8",
+          wasmDtype: "q8"
+        };
+
+        const fileProgressMap = new Map();
+        const progressCallback = (info) => {
+          if (info.status === "progress" && info.file) {
+            fileProgressMap.set(info.file, {
+              loaded: info.loaded || 0,
+              total: info.total || 0
+            });
+            let totalLoaded = 0;
+            let totalBytes = 0;
+            fileProgressMap.forEach((v) => {
+              totalLoaded += v.loaded;
+              totalBytes += v.total;
+            });
+            if (totalBytes > 0) {
+              const pct = Math.min(60, Math.round((totalLoaded / totalBytes) * 60));
+              const mbLoaded = (totalLoaded / 1048576).toFixed(1);
+              const mbTotal = (totalBytes / 1048576).toFixed(1);
+              updateProgress(pct, `Downloading model weights (${mbLoaded} / ${mbTotal} MB)...`);
+            }
+          } else if (info.status === "ready") {
+            updateProgress(62, "Model weights loaded into memory.");
+          }
+        };
+
+        try {
+          const deviceToUse = preferredDevice;
+          const dtypeToUse = deviceToUse === "webgpu" ? cfg.webgpuDtype : cfg.wasmDtype;
+          setStatus(`Loading ${modelName} (${deviceToUse.toUpperCase()})...`, "text-blue-700");
+
+          cachedTranscriber = await transformersModule.pipeline(
+            "automatic-speech-recognition",
+            modelName,
+            {
+              device: deviceToUse,
+              dtype: dtypeToUse,
+              progress_callback: progressCallback
+            }
+          );
+          cachedModelKey = cacheKey;
+          return cachedTranscriber;
+        } catch (webgpuErr) {
+          if (preferredDevice === "webgpu") {
+            preferredDevice = "wasm";
+            modelBadge.textContent = "Ready · Browser WASM";
+            setStatus(`Falling back to WASM CPU for ${modelName}...`, "text-blue-700");
+
+            cachedTranscriber = await transformersModule.pipeline(
+              "automatic-speech-recognition",
+              modelName,
+              {
+                device: "wasm",
+                dtype: cfg.wasmDtype,
+                progress_callback: progressCallback
+              }
+            );
+            cachedModelKey = `${modelName}::wasm`;
+            return cachedTranscriber;
+          }
+          throw webgpuErr;
+        }
       }
 
       async function extractSpeechFromAudioBuffer(file) {
-        setStatus("Loading in-browser Whisper AI pipeline...", "text-blue-700");
-        const pipeline = await loadTransformersPipeline();
-        const modelName = languageSelect.value;
-        const transcriber = await pipeline('automatic-speech-recognition', modelName);
+        const modelName = modelSelect.value;
+        const cfg = MODEL_CONFIGS[modelName] || { multilingual: true };
+        const transcriber = await getTranscriber(modelName);
 
+        if (!isProcessing) throw new Error("Cancelled");
+
+        updateProgress(65, "Decoding and resampling audio to 16kHz mono...");
         setStatus("Decoding and resampling audio to 16kHz mono...", "text-blue-700");
         const arrayBuffer = await file.arrayBuffer();
-        
+
         const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
         const decodedBuffer = await tempCtx.decodeAudioData(arrayBuffer);
         await tempCtx.close();
+
+        if (!mediaDuration || isNaN(mediaDuration)) {
+          mediaDuration = decodedBuffer.duration;
+        }
 
         const targetRate = 16000;
         const offlineCtx = new OfflineAudioContext(
@@ -334,14 +561,29 @@
         const resampledBuffer = await offlineCtx.startRendering();
         const rawAudio = resampledBuffer.getChannelData(0);
 
-        setStatus("Transcribing spoken words locally...", "text-blue-700");
-        
+        if (!isProcessing) throw new Error("Cancelled");
+
+        const selectedLang = spokenLanguageSelect.value;
+        const selectedTask = taskModeSelect.value;
+        const langLabel = cfg.multilingual
+          ? (selectedLang === "auto" ? "auto-detected language" : selectedLang)
+          : "English";
+
+        updateProgress(72, `Transcribing (${langLabel})...`);
+        setStatus(`Running Whisper AI (${langLabel})...`, "text-blue-700");
+
         const transcriptionOptions = {
           return_timestamps: true,
           chunk_length_s: 30,
-          stride_length_s: 5,
-          task: 'transcribe'
+          stride_length_s: 5
         };
+
+        if (cfg.multilingual) {
+          transcriptionOptions.task = selectedTask;
+          if (selectedLang !== "auto") {
+            transcriptionOptions.language = selectedLang;
+          }
+        }
 
         if (filterMusicCheckbox.checked) {
           transcriptionOptions.temperature = 0.0;
@@ -353,19 +595,25 @@
 
         if (!output || !output.chunks) return [];
 
-        return output.chunks.map(chunk => {
-          let text = chunk.text.trim();
-          if (filterMusicCheckbox.checked) {
-            text = text.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
-          }
-          return {
-            startMs: (chunk.timestamp[0] ?? 0) * 1000,
-            endMs: Math.min(mediaDuration * 1000, (chunk.timestamp[1] ?? 2) * 1000),
-            startSec: chunk.timestamp[0] ?? 0,
-            endSec: Math.min(mediaDuration, chunk.timestamp[1] ?? 2),
-            text: text
-          };
-        }).filter(c => c.text.length > 0);
+        return output.chunks
+          .map((chunk) => {
+            let text = chunk.text.trim();
+            if (filterMusicCheckbox.checked) {
+              text = text.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim();
+            }
+            const startSec = chunk.timestamp[0] ?? 0;
+            const rawEndSec = chunk.timestamp[1] ?? Math.max(startSec + 2, mediaDuration);
+            const endSec = mediaDuration > 0 ? Math.min(mediaDuration, rawEndSec) : rawEndSec;
+
+            return {
+              startMs: startSec * 1000,
+              endMs: endSec * 1000,
+              startSec,
+              endSec,
+              text
+            };
+          })
+          .filter((c) => c.text.length > 0);
       }
 
       function renderVideoWithCaptions(cues) {
@@ -469,14 +717,41 @@
         });
       }
 
+      // Wraps both space-separated text and continuous CJK strings to fit inside the video frame
+      function wrapCaptionLines(ctx, text, maxWidth) {
+        const paragraphs = text.split("\n");
+        const wrappedLines = [];
+
+        paragraphs.forEach((paragraph) => {
+          const tokens = paragraph.includes(" ") ? paragraph.split(/\s+/) : Array.from(paragraph);
+          const joiner = paragraph.includes(" ") ? " " : "";
+          let currentLine = "";
+
+          tokens.forEach((token) => {
+            const candidate = currentLine ? `${currentLine}${joiner}${token}` : token;
+            if (ctx.measureText(candidate).width <= maxWidth || !currentLine) {
+              currentLine = candidate;
+            } else {
+              wrappedLines.push(currentLine);
+              currentLine = token;
+            }
+          });
+
+          if (currentLine) wrappedLines.push(currentLine);
+        });
+
+        return wrappedLines;
+      }
+
       function drawCaptionOverlay(ctx, text, width, height) {
-        const fontSize = Math.max(22, Math.floor(height * 0.05));
+        const fontSize = Math.max(22, Math.floor(height * 0.048));
         ctx.font = `700 ${fontSize}px "DM Sans", sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        const lines = text.split("\n");
-        const padding = fontSize * 0.7;
+        const maxTextWidth = width * 0.84;
+        const lines = wrapCaptionLines(ctx, text, maxTextWidth);
+        const padding = fontSize * 0.65;
         const lineHeight = fontSize * 1.35;
 
         let maxLineWidth = 0;
@@ -485,10 +760,10 @@
           if (w > maxLineWidth) maxLineWidth = w;
         });
 
-        const boxWidth = maxLineWidth + padding * 2;
+        const boxWidth = Math.min(width * 0.92, maxLineWidth + padding * 2);
         const boxHeight = lines.length * lineHeight + padding;
         const boxX = (width - boxWidth) / 2;
-        const boxY = height - boxHeight - height * 0.1;
+        const boxY = height - boxHeight - height * 0.08;
 
         ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
         ctx.beginPath();
@@ -501,7 +776,7 @@
 
         ctx.fillStyle = "#FFFFFF";
         lines.forEach((line, idx) => {
-          const lineY = boxY + padding + idx * lineHeight + fontSize / 2;
+          const lineY = boxY + padding * 0.5 + idx * lineHeight + lineHeight / 2;
           ctx.fillText(line, width / 2, lineY);
         });
       }
